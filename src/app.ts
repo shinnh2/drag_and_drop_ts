@@ -1,3 +1,18 @@
+//autobind 데코레이터 : 이벤트 핸들러의 this 바인딩을 자동으로 처리
+function autobind(
+	_target: any,
+	_methodName: string,
+	descriptor: PropertyDescriptor
+) {
+	const originalMethod = descriptor.value;
+	const adjDescriptor: PropertyDescriptor = {
+		configurable: true,
+		get() {
+			return originalMethod.bind(this);
+		},
+	};
+	return adjDescriptor;
+}
 //사용자의 입력을 받아 개별 프로젝트 신규 등록을 처리하는 클래스
 class ProjectInput {
 	templateElement: HTMLTemplateElement;
@@ -33,8 +48,9 @@ class ProjectInput {
 		this.hostElement.insertAdjacentElement("afterbegin", this.element);
 	}
 	private configure() {
-		this.element.addEventListener("submit", this.submitHandler.bind(this));
+		this.element.addEventListener("submit", this.submitHandler);
 	}
+	@autobind
 	private submitHandler(event: Event) {
 		event.preventDefault();
 		console.log(this.titleInputElement.value);
