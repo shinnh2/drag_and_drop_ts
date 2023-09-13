@@ -53,9 +53,34 @@ class ProjectInput {
 	@autobind
 	private submitHandler(event: Event) {
 		event.preventDefault();
-		console.log(this.titleInputElement.value);
-		console.log(this.descriptionInputElement.value);
-		console.log(this.peopleInputElement.value);
+		const userInput = this.gatherUserInput();
+		if (Array.isArray(userInput)) {
+			const [title, desc, people] = userInput;
+		}
+		this.clearInputs();
+	}
+	private gatherUserInput(): [string, string, number] | void {
+		const enteredTitle = this.titleInputElement.value;
+		const enteredDescription = this.descriptionInputElement.value;
+		const enteredPeople = this.peopleInputElement.value;
+		if (enteredTitle.trim().length === 0) {
+			alert("제목을 입력해주세요");
+			return;
+		}
+		if (enteredDescription.trim().length === 0) {
+			alert("설명을 입력해주세요");
+			return;
+		}
+		if (enteredPeople.trim().length === 0) {
+			alert("인원수를 입력해주세요");
+			return;
+		}
+		return [enteredTitle, enteredDescription, +enteredPeople];
+	}
+	private clearInputs() {
+		this.titleInputElement.value = "";
+		this.descriptionInputElement.value = "";
+		this.peopleInputElement.value = "";
 	}
 }
 
