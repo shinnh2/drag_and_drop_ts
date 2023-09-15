@@ -1,3 +1,38 @@
+//프로젝트 상태를 관리하는 싱글톤 클래스 ProjectState
+class ProjectState {
+	private static instance: ProjectState;
+	private projects: any[] = [];
+	private listeners: any[] = [];
+
+	private constructor() {}
+
+	static getInstance() {
+		if (this.instance) return this.instance;
+		this.instance = new ProjectState();
+		return this.instance;
+	}
+
+	addProject(title: string, description: string, numOfPeople: number) {
+		const newProject = {
+			id: Math.random().toString(),
+			title: title,
+			description: description,
+			numOfPeople: numOfPeople,
+		};
+		this.projects.push(newProject);
+		//프로젝트가 추가되어 프로젝트 목록이 변경됨. 이를 리스너에 전달
+		for (let listenerFn of this.listeners) {
+			listenerFn(this.projects.slice());
+		}
+	}
+	//리스너를 리스너 목록에 추가
+	addListener(listenerFn: Function) {
+		this.listeners.push(listenerFn);
+	}
+}
+
+const projectState = ProjectState.getInstance();
+
 //autobind 데코레이터 : 이벤트 핸들러의 this 바인딩을 자동으로 처리
 function autobind(
 	_target: any,
@@ -49,6 +84,7 @@ function validater(validatableInput: Validatable): boolean {
 	}
 	return isValid;
 }
+
 //사용자의 입력을 받아 개별 프로젝트 신규 등록을 처리하는 클래스
 class ProjectInput {
 	templateElement: HTMLTemplateElement;
@@ -91,7 +127,8 @@ class ProjectInput {
 		event.preventDefault();
 		const userInput = this.gatherUserInput();
 		if (Array.isArray(userInput)) {
-			// const [title, desc, people] = userInput;
+			const [title, desc, people] = userInput;
+			projectState.addProject(title, desc, people);
 			this.clearInputs();
 		}
 	}
@@ -143,18 +180,24 @@ class ProjectList {
 	templateElement: HTMLTemplateElement;
 	hostElement: HTMLDivElement;
 	element: HTMLElement;
+	assignedProjects: any[];
 
 	constructor(private type: "active" | "finished") {
 		this.templateElement = <HTMLTemplateElement>(
 			document.querySelector("#project-list")!
 		);
 		this.hostElement = <HTMLDivElement>document.querySelector("#app")!;
+		this.assignedProjects = [];
 		const importedNode = document.importNode(
 			this.templateElement.content,
 			true
 		);
 		this.element = <HTMLElement>importedNode.firstElementChild!;
 		this.element.id = `${this.type}-projects`;
+		projectState.addListener((projects: any[]) => {
+			this.assignedProjects = projects; //전체 상태에서 프로젝트 목록 전체를 받아옴
+			this.renderProjects(); //프로젝트 목록 내의 개별 프로젝트들을 렌더링해주는 함수
+		});
 		this.attach();
 		this.renderContent();
 	}
@@ -167,6 +210,16 @@ class ProjectList {
 		const listTitle = `${this.type.toUpperCase()} PROJECT`;
 		this.element.querySelector("ul")!.id = listId;
 		this.element.querySelector("h2")!.textContent = listTitle;
+	}
+	renderProjects() {
+		const listEl = <HTMLUListElement>(
+			this.element.querySelector(`#${this.type}-projects-list`)!
+		);
+		for (let prjItem of this.assignedProjects) {
+			const listItem = document.createElement("li");
+			listItem.textContent = prjItem.title;
+			listEl.appendChild(listItem);
+		}
 	}
 }
 
