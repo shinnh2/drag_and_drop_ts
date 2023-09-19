@@ -1,7 +1,8 @@
-//프로젝트 상태를 관리하는 싱글톤 클래스 ProjectState
+//ProjectState: 프로젝트 상태를 관리하는 싱글톤 클래스
+type Listener = (items: Project[]) => void;
 class ProjectState {
 	private static instance: ProjectState;
-	private projects: any[] = [];
+	private projects: Project[] = [];
 	private listeners: any[] = [];
 
 	private constructor() {}
@@ -13,25 +14,39 @@ class ProjectState {
 	}
 
 	addProject(title: string, description: string, numOfPeople: number) {
-		const newProject = {
-			id: Math.random().toString(),
-			title: title,
-			description: description,
-			numOfPeople: numOfPeople,
-		};
+		const newProject = new Project(
+			Math.random().toString(),
+			title,
+			description,
+			numOfPeople,
+			ProjectStatus.Active
+		);
 		this.projects.push(newProject);
-		//프로젝트가 추가되어 프로젝트 목록이 변경됨. 이를 리스너에 전달
 		for (let listenerFn of this.listeners) {
 			listenerFn(this.projects.slice());
 		}
 	}
-	//리스너를 리스너 목록에 추가
-	addListener(listenerFn: Function) {
+	addListener(listenerFn: Listener) {
 		this.listeners.push(listenerFn);
 	}
 }
-
+//ProjectState 클래스 인스턴스 생성
 const projectState = ProjectState.getInstance();
+
+//Project: 개별 프로젝트를 나타내는 클래스
+enum ProjectStatus {
+	Active,
+	Finished,
+}
+class Project {
+	constructor(
+		public id: string,
+		public title: string,
+		public description: string,
+		public people: number,
+		public status: ProjectStatus
+	) {}
+}
 
 //autobind 데코레이터 : 이벤트 핸들러의 this 바인딩을 자동으로 처리
 function autobind(
@@ -48,7 +63,8 @@ function autobind(
 	};
 	return adjDescriptor;
 }
-//유효성 검사 함수 validater
+
+//validater: 유효성 검사 함수
 interface Validatable {
 	value: string | number;
 	required?: boolean;
@@ -85,7 +101,7 @@ function validater(validatableInput: Validatable): boolean {
 	return isValid;
 }
 
-//사용자의 입력을 받아 개별 프로젝트 신규 등록을 처리하는 클래스
+//ProjectInput: 사용자의 입력을 받아 개별 프로젝트 신규 등록을 처리하는 클래스
 class ProjectInput {
 	templateElement: HTMLTemplateElement;
 	hostElement: HTMLDivElement;
@@ -175,12 +191,12 @@ class ProjectInput {
 	}
 }
 
-//프로젝트 목록 렌더링
+//ProjectList: 프로젝트 목록 렌더링
 class ProjectList {
 	templateElement: HTMLTemplateElement;
 	hostElement: HTMLDivElement;
 	element: HTMLElement;
-	assignedProjects: any[];
+	assignedProjects: Project[];
 
 	constructor(private type: "active" | "finished") {
 		this.templateElement = <HTMLTemplateElement>(
@@ -194,7 +210,7 @@ class ProjectList {
 		);
 		this.element = <HTMLElement>importedNode.firstElementChild!;
 		this.element.id = `${this.type}-projects`;
-		projectState.addListener((projects: any[]) => {
+		projectState.addListener((projects: Project[]) => {
 			this.assignedProjects = projects; //전체 상태에서 프로젝트 목록 전체를 받아옴
 			this.renderProjects(); //프로젝트 목록 내의 개별 프로젝트들을 렌더링해주는 함수
 		});
