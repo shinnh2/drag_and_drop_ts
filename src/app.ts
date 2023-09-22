@@ -211,8 +211,13 @@ class ProjectList {
 		this.element = <HTMLElement>importedNode.firstElementChild!;
 		this.element.id = `${this.type}-projects`;
 		projectState.addListener((projects: Project[]) => {
-			this.assignedProjects = projects; //전체 상태에서 프로젝트 목록 전체를 받아옴
-			this.renderProjects(); //프로젝트 목록 내의 개별 프로젝트들을 렌더링해주는 함수
+			const relevantProjects = projects.filter((project) =>
+				this.type === "active"
+					? project.status === ProjectStatus.Active
+					: project.status === ProjectStatus.Finished
+			);
+			this.assignedProjects = relevantProjects;
+			this.renderProjects();
 		});
 		this.attach();
 		this.renderContent();
@@ -231,6 +236,7 @@ class ProjectList {
 		const listEl = <HTMLUListElement>(
 			this.element.querySelector(`#${this.type}-projects-list`)!
 		);
+		listEl.innerHTML = "";
 		for (let prjItem of this.assignedProjects) {
 			const listItem = document.createElement("li");
 			listItem.textContent = prjItem.title;
