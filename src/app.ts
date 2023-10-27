@@ -1,11 +1,19 @@
+//State: 프로젝트 상태를 나타내는 기본 상태 클래스
+type Listener<T> = (items: T[]) => void;
+class State<T> {
+	protected listeners: Listener<T>[] = [];
+	addListener(listenerFn: Listener<T>) {
+		this.listeners.push(listenerFn);
+	}
+}
 //ProjectState: 프로젝트 상태를 관리하는 싱글톤 클래스
-type Listener = (items: Project[]) => void;
-class ProjectState {
-	private static instance: ProjectState;
+class ProjectState extends State<Project> {
 	private projects: Project[] = [];
-	private listeners: any[] = [];
+	private static instance: ProjectState;
 
-	private constructor() {}
+	private constructor() {
+		super();
+	}
 
 	static getInstance() {
 		if (this.instance) return this.instance;
@@ -25,9 +33,6 @@ class ProjectState {
 		for (let listenerFn of this.listeners) {
 			listenerFn(this.projects.slice());
 		}
-	}
-	addListener(listenerFn: Listener) {
-		this.listeners.push(listenerFn);
 	}
 }
 //ProjectState 클래스 인스턴스 생성
@@ -101,27 +106,51 @@ function validater(validatableInput: Validatable): boolean {
 	return isValid;
 }
 
-//ProjectInput: 사용자의 입력을 받아 개별 프로젝트 신규 등록을 처리하는 클래스
-class ProjectInput {
+//Component: 다른 클래스들의 기본이 되는 base 컴포넌트 클래스
+abstract class Component<T extends HTMLElement, U extends HTMLElement> {
 	templateElement: HTMLTemplateElement;
-	hostElement: HTMLDivElement;
-	element: HTMLFormElement;
+	hostElement: T;
+	element: U;
+
+	constructor(
+		templateId: string,
+		hostElementId: string,
+		insertAtStart: boolean,
+		newElementId?: string
+	) {
+		this.templateElement = <HTMLTemplateElement>(
+			document.querySelector(templateId)!
+		);
+		this.hostElement = <T>document.querySelector(hostElementId)!;
+		const importedNode = document.importNode(
+			this.templateElement.content,
+			true
+		);
+		this.element = <U>importedNode.firstElementChild!;
+		if (newElementId) this.element.id = newElementId;
+
+		this.attach(insertAtStart);
+	}
+
+	attach(insertAtBeginning: boolean) {
+		this.hostElement.insertAdjacentElement(
+			insertAtBeginning ? "afterbegin" : "beforeend",
+			this.element
+		);
+	}
+
+	abstract configure(): void;
+	abstract renderContent(): void;
+}
+
+//ProjectInput: 사용자의 입력을 받아 개별 프로젝트 신규 등록을 처리하는 클래스
+class ProjectInput extends Component<HTMLDivElement, HTMLFormElement> {
 	titleInputElement: HTMLInputElement;
 	descriptionInputElement: HTMLInputElement;
 	peopleInputElement: HTMLInputElement;
 
 	constructor() {
-		this.templateElement = <HTMLTemplateElement>(
-			document.querySelector("#project-input")!
-		);
-		this.hostElement = <HTMLDivElement>document.querySelector("#app")!;
-		const importedNode = document.importNode(
-			this.templateElement.content,
-			true
-		);
-		this.element = <HTMLFormElement>importedNode.firstElementChild!;
-		this.element.id = "user-input";
-		this.attach();
+		super("#project-input", "#app", true, "user-input");
 
 		this.titleInputElement = <HTMLInputElement>document.querySelector("#title");
 		this.descriptionInputElement = <HTMLInputElement>(
@@ -130,14 +159,14 @@ class ProjectInput {
 		this.peopleInputElement = <HTMLInputElement>(
 			document.querySelector("#people")
 		);
+
 		this.configure();
+		this.renderContent();
 	}
-	private attach() {
-		this.hostElement.insertAdjacentElement("afterbegin", this.element);
-	}
-	private configure() {
+	configure() {
 		this.element.addEventListener("submit", this.submitHandler);
 	}
+	renderContent() {}
 	@autobind
 	private submitHandler(event: Event) {
 		event.preventDefault();
@@ -192,24 +221,18 @@ class ProjectInput {
 }
 
 //ProjectList: 프로젝트 목록 렌더링
-class ProjectList {
-	templateElement: HTMLTemplateElement;
-	hostElement: HTMLDivElement;
-	element: HTMLElement;
+class ProjectList extends Component<HTMLDivElement, HTMLElement> {
 	assignedProjects: Project[];
 
 	constructor(private type: "active" | "finished") {
-		this.templateElement = <HTMLTemplateElement>(
-			document.querySelector("#project-list")!
-		);
-		this.hostElement = <HTMLDivElement>document.querySelector("#app")!;
+		super("#project-list", "#app", false, `${type}-projects`);
 		this.assignedProjects = [];
-		const importedNode = document.importNode(
-			this.templateElement.content,
-			true
-		);
-		this.element = <HTMLElement>importedNode.firstElementChild!;
-		this.element.id = `${this.type}-projects`;
+
+		this.configure();
+		this.renderContent();
+	}
+
+	configure() {
 		projectState.addListener((projects: Project[]) => {
 			const relevantProjects = projects.filter((project) =>
 				this.type === "active"
@@ -219,13 +242,8 @@ class ProjectList {
 			this.assignedProjects = relevantProjects;
 			this.renderProjects();
 		});
-		this.attach();
-		this.renderContent();
 	}
 
-	attach() {
-		this.hostElement.insertAdjacentElement("beforeend", this.element);
-	}
 	renderContent() {
 		const listId = `${this.type}-projects-list`;
 		const listTitle = `${this.type.toUpperCase()} PROJECT`;
