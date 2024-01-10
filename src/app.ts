@@ -1,3 +1,18 @@
+//Project: 개별 프로젝트를 나타내는 클래스
+enum ProjectStatus {
+	Active,
+	Finished,
+}
+class Project {
+	constructor(
+		public id: string,
+		public title: string,
+		public description: string,
+		public people: number,
+		public status: ProjectStatus
+	) {}
+}
+
 //State: 프로젝트 상태를 나타내는 기본 상태 클래스
 type Listener<T> = (items: T[]) => void;
 class State<T> {
@@ -30,6 +45,18 @@ class ProjectState extends State<Project> {
 			ProjectStatus.Active
 		);
 		this.projects.push(newProject);
+		this.updataListeners();
+	}
+
+	moveProject(projectId: string, newStatus: ProjectStatus) {
+		const project = this.projects.find((el) => el.id === projectId);
+		if (project && project.status !== newStatus) {
+			project.status = newStatus;
+			this.updataListeners();
+		}
+	}
+
+	private updataListeners() {
 		for (let listenerFn of this.listeners) {
 			listenerFn(this.projects.slice());
 		}
@@ -37,21 +64,6 @@ class ProjectState extends State<Project> {
 }
 //ProjectState 클래스 인스턴스 생성
 const projectState = ProjectState.getInstance();
-
-//Project: 개별 프로젝트를 나타내는 클래스
-enum ProjectStatus {
-	Active,
-	Finished,
-}
-class Project {
-	constructor(
-		public id: string,
-		public title: string,
-		public description: string,
-		public people: number,
-		public status: ProjectStatus
-	) {}
-}
 
 //autobind 데코레이터 : 이벤트 핸들러의 this 바인딩을 자동으로 처리
 function autobind(
@@ -104,6 +116,17 @@ function validater(validatableInput: Validatable): boolean {
 		isValid = isValid && validatableInput.value <= validatableInput.max;
 	}
 	return isValid;
+}
+
+//drag & drop 인터페이스
+interface Draggable {
+	dragStartHandler(event: DragEvent): void;
+	dragEndHandler(event: DragEvent): void;
+}
+interface DragTarget {
+	dragOverHandler(event: DragEvent): void;
+	dropHandler(event: DragEvent): void;
+	dragLeaveHandler(event: DragEvent): void;
 }
 
 //Component: 다른 클래스들의 기본이 되는 base 컴포넌트 클래스
@@ -221,7 +244,10 @@ class ProjectInput extends Component<HTMLDivElement, HTMLFormElement> {
 }
 
 //ProjectItem : 프로젝트 목록 개별 프로젝트 아이템 렌더링
-class ProjectItem extends Component<HTMLUListElement, HTMLLIElement> {
+class ProjectItem
+	extends Component<HTMLUListElement, HTMLLIElement>
+	implements Draggable
+{
 	private project: Project;
 
 	get persons() {
@@ -238,16 +264,37 @@ class ProjectItem extends Component<HTMLUListElement, HTMLLIElement> {
 		this.renderContent();
 	}
 
-	configure() {}
+	configure() {
+		this.element.addEventListener("dragstart", this.dragStartHandler);
+		this.element.addEventListener("dragend", this.dragEndHandler);
+	}
 	renderContent() {
 		this.element.querySelector("h2")!.textContent = this.project.title;
 		this.element.querySelector("h3")!.textContent = `${this.persons} assigned`;
 		this.element.querySelector("p")!.textContent = this.project.description;
 	}
+	@autobind
+	dragStartHandler(event: DragEvent): void {
+		//드래그 이벤트가 시작될 때 발생하는 메서드
+		//위 dataTransfer 객체는 드래그 앤 드롭 작업 중에 드래그되고 있는 데이터를 보관하기 위해 사용된다.
+		event.dataTransfer!.setData("text/plain", this.project.id);
+		//지정된 타입의 데이터를 설정한다. 첫번째 인자 데이터 형식, 두번째는 데이터
+		event.dataTransfer!.effectAllowed = "move";
+		//드래그시 허용되는 효과를 지정한다. 데이터가 현재 위치에서 드롭위치로 복사되는지, 이동되는지 등을 나타낸다.
+		//여기서는 이동이 목적이므로 =’move’ 를 덧붙여 주어 드래그의 의도를 나타내준다.
+	}
+	@autobind
+	dragEndHandler(_: DragEvent): void {
+		//드래그 이벤트가 끝날 때 발생하는 메서드
+		//사용하지 않는 매개변수는 '_'로 처리해야 에러없이 컴파일된다.
+	}
 }
 
 //ProjectList: 프로젝트 목록 렌더링
-class ProjectList extends Component<HTMLDivElement, HTMLElement> {
+class ProjectList
+	extends Component<HTMLDivElement, HTMLElement>
+	implements DragTarget
+{
 	assignedProjects: Project[];
 
 	constructor(private type: "active" | "finished") {
@@ -258,7 +305,36 @@ class ProjectList extends Component<HTMLDivElement, HTMLElement> {
 		this.renderContent();
 	}
 
+	@autobind
+	dragOverHandler(event: DragEvent): void {
+		//해당 메서드는 개별 프로젝트를 드래그하고 있는 상태에서 드롭가능한 곳에 도달했을 때 표시해주는 작업을 처리해줄 수 있다.
+		if (event.dataTransfer && event.dataTransfer.types[0] === "text/plain") {
+			event.preventDefault();
+			//위 문구를 작성하지 않으면 사용자가 드래그 후 드롭했을 때 드롭 이벤트가 실행되지 않는다.
+		}
+
+		const listEl = this.element.querySelector("ul")!;
+		listEl.classList.add("droppable");
+	}
+	@autobind
+	dragLeaveHandler(_: DragEvent): void {
+		//해당 메서드는 개별 프로젝트를 드래그하고 있는 상태에서 드롭가능한 곳을 떠났을 때 드롭가능한 곳의 모습이 변경되었을 경우 다시 원상복구 하는 등의 처리를 해준다.
+		const listEl = this.element.querySelector("ul")!;
+		listEl.classList.remove("droppable");
+	}
+	@autobind
+	dropHandler(event: DragEvent): void {
+		const prjId = event.dataTransfer!.getData("text/plain");
+		projectState.moveProject(
+			prjId,
+			this.type === "active" ? ProjectStatus.Active : ProjectStatus.Finished
+		);
+	}
+
 	configure() {
+		this.element.addEventListener("dragover", this.dragOverHandler);
+		this.element.addEventListener("dragleave", this.dragLeaveHandler);
+		this.element.addEventListener("drop", this.dropHandler);
 		projectState.addListener((projects: Project[]) => {
 			const relevantProjects = projects.filter((project) =>
 				this.type === "active"
